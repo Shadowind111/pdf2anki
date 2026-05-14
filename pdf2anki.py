@@ -20,10 +20,11 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QPushButton, QLabel, QFileDialog,
-                             QProgressBar, QTextEdit, QLineEdit, QGroupBox,
-                             QSpinBox, QComboBox, QFrame, QCheckBox)
+                             QProgressBar, QTextEdit, QLineEdit,
+                             QSpinBox, QComboBox, QFrame, QCheckBox,
+                             QGridLayout, QScrollArea)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from PyQt6.QtGui import QFont, QTextCursor, QPixmap
+from PyQt6.QtGui import QFont, QFontDatabase, QTextCursor, QPixmap
 import genanki
 
 APP_NAME = "pdf2anki"
@@ -875,7 +876,7 @@ class ProcessingThread(QThread):
         task_id = f"{os.path.basename(self.file_path)}_{self.learning_level}"
         actual_start_page = self.resume_page if self.resume_page else self.start_page
 
-        self.log_update.emit("info", f"🚀 开始处理文档: {os.path.basename(self.file_path)}")
+        self.log_update.emit("info", f"开始处理文档: {os.path.basename(self.file_path)}")
         cursor.execute('INSERT OR IGNORE INTO tasks (task_id, file_path, current_page) VALUES (?, ?, ?)',
                        (task_id, self.file_path, actual_start_page - 1))
         conn.commit()
@@ -887,7 +888,7 @@ class ProcessingThread(QThread):
             total_process_pages = actual_end - self.start_page + 1
             toc_index = self._build_toc_index(doc)
             if toc_index:
-                self.log_update.emit("info", f"📚 已读取目录层级，将用于卡片前置背景（{len(toc_index)} 条）")
+                self.log_update.emit("info", f"已读取目录层级，将用于卡片前置背景（{len(toc_index)} 条）")
             else:
                 self.log_update.emit("warning", "未读取到 PDF 目录，将使用页码作为卡片背景")
 
@@ -896,18 +897,18 @@ class ProcessingThread(QThread):
 
             for page_num in range(actual_start_page - 1, actual_end):
                 if not self.is_running:
-                    self.status_update.emit("⏸️ 任务已暂停")
+                    self.status_update.emit("任务已暂停")
                     break
 
                 current_progress = int(((page_num - self.start_page + 1) / total_process_pages) * 100)
                 self.progress_update.emit(current_progress, f"正在处理页码: {page_num + 1}/{actual_end}")
-                self.status_update.emit("📄 正在提取页面文本与图像...")
+                self.status_update.emit("正在提取页面文本与图像...")
 
                 page = doc[page_num]
                 page_text = page.get_text()
 
                 if ai_core.vision_api_key and self._looks_like_bad_text(page_text):
-                    self.status_update.emit(f"🔍 第 {page_num + 1} 页文本质量差，自动启用 OCR 校准...")
+                    self.status_update.emit(f"第 {page_num + 1} 页文本质量差，自动启用 OCR 校准...")
                     try:
                         self.preview_update.emit(self._render_page_preview(page), f"第 {page_num + 1} 页 OCR 校准中")
                         page_b64 = self._render_page_for_ocr(page)
@@ -916,12 +917,12 @@ class ProcessingThread(QThread):
                             self.log_update.emit("error", f"OCR 校准失败: {ocr_err}")
                         elif ocr_text.strip():
                             page_text = ocr_text
-                            self.log_update.emit("success", f"✅ 第 {page_num + 1} 页已完成 OCR/乱码校准")
+                            self.log_update.emit("success", f"第 {page_num + 1} 页已完成 OCR/乱码校准")
                     except Exception as ocr_render_err:
                         self.log_update.emit("error", f"OCR 页面渲染失败: {ocr_render_err}")
 
                 if ai_core.vision_api_key and self._looks_like_visual_knowledge_page(page, page_text):
-                    self.status_update.emit(f"🧩 第 {page_num + 1} 页疑似含流程/表格，进行整页视觉解析...")
+                    self.status_update.emit(f"第 {page_num + 1} 页疑似含流程/表格，进行整页视觉解析...")
                     try:
                         self.preview_update.emit(self._render_page_preview(page), f"第 {page_num + 1} 页整页图表/流程解析中")
                         visual_b64 = self._render_page_for_visual_analysis(page)
@@ -933,7 +934,7 @@ class ProcessingThread(QThread):
                                 "\n\n<div class='visual-note visual-note-page'><strong>整页图表/流程视觉解析</strong><br>"
                                 f"{visual_text}</div>\n\n"
                             )
-                            self.log_update.emit("success", f"✅ 第 {page_num + 1} 页已补充整页图表/流程解析")
+                            self.log_update.emit("success", f"第 {page_num + 1} 页已补充整页图表/流程解析")
                     except Exception as visual_render_err:
                         self.log_update.emit("warning", f"整页视觉解析渲染失败: {visual_render_err}")
 
@@ -983,7 +984,7 @@ class ProcessingThread(QThread):
                     chunk = buffer_text[:2200]
                     buffer_text = buffer_text[1900:]
 
-                    self.status_update.emit("🧠 三阶段生成：抽取知识 → 设计卡片 → 质检挖空...")
+                    self.status_update.emit("三阶段生成：抽取知识 → 设计卡片 → 质检挖空...")
                     cards, err = ai_core.generate_cloze_cards_v2(chunk, self.learning_level, page_num + 1)
 
                     if err:
@@ -994,7 +995,7 @@ class ProcessingThread(QThread):
                             card = self._apply_card_context(card, topic, page_num + 1)
                             self._insert_card(cursor, task_id, f"Page {page_num + 1}", card)
                         conn.commit()
-                        self.log_update.emit("success", f"✅ 成功提取并生成 {len(cards)} 张临床卡片")
+                        self.log_update.emit("success", f"成功提取并生成 {len(cards)} 张临床卡片")
                     else:
                         self.log_update.emit("warning", "本段文本为纯理论背景，未提取出符合实战标准的知识点。")
 
@@ -1004,7 +1005,7 @@ class ProcessingThread(QThread):
                 conn.commit()
 
             if self.is_running and len(buffer_text.strip()) > 50:
-                self.status_update.emit("🧠 正在处理尾部数据：三阶段生成卡片...")
+                self.status_update.emit("正在处理尾部数据：三阶段生成卡片...")
                 cards, err = ai_core.generate_cloze_cards_v2(buffer_text, self.learning_level, actual_end)
                 if cards:
                     topic = self._topic_for_page(toc_index, actual_end)
@@ -1014,13 +1015,13 @@ class ProcessingThread(QThread):
                     conn.commit()
 
             if self.is_running:
-                self.status_update.emit("📦 正在打包生成 Anki 文件...")
+                self.status_update.emit("正在打包生成 Anki 文件...")
                 self.export_anki(task_id, conn)
 
         except Exception as e:
             error_trace = traceback.format_exc()
             self.log_update.emit("error", f"致命错误: {str(e)}\n{error_trace}")
-            self.status_update.emit("❌ 任务异常终止")
+            self.status_update.emit("任务异常终止")
         finally:
             if doc: doc.close()
             if conn: conn.close()
@@ -1394,7 +1395,7 @@ class ProcessingThread(QThread):
 
         output_name = os.path.abspath(f"pdf2anki_output_{datetime.now().strftime('%Y%m%d%H%M')}.apkg")
         genanki.Package(deck).write_to_file(output_name)
-        self.status_update.emit("✅ 打包完成！")
+        self.status_update.emit("打包完成")
         self.finished_signal.emit(output_name)
 
 
@@ -1413,205 +1414,633 @@ class MainWindow(QMainWindow):
     def init_db_schema(self):
         ensure_db_schema(DB_PATH)
 
+    def apply_theme(self):
+        for font_path in (
+                r"C:\Windows\Fonts\NotoSansSC-VF.ttf",
+                r"C:\Windows\Fonts\msyh.ttc",
+                r"C:\Windows\Fonts\Deng.ttf",
+        ):
+            if os.path.exists(font_path):
+                QFontDatabase.addApplicationFont(font_path)
+        QApplication.instance().setFont(QFont("Microsoft YaHei UI", 9))
+        self.setStyleSheet("""
+            QWidget {
+                color: #102033;
+                font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans SC", "Segoe UI", system-ui, sans-serif;
+                font-size: 13px;
+            }
+            QMainWindow {
+                background-color: #eef3f8;
+            }
+            QFrame#leftRail {
+                background-color: #102033;
+                border-radius: 14px;
+            }
+            QLabel#appTitle {
+                color: #f6f8fb;
+                font-size: 22px;
+                font-weight: 800;
+            }
+            QLabel#appSubtitle {
+                color: #b8c5d6;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+            QLabel#railSectionLabel {
+                color: #8ea0b8;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+            QFrame#stepItem {
+                background-color: rgba(255, 255, 255, 0.06);
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 10px;
+            }
+            QLabel#stepNumber {
+                color: #102033;
+                background-color: #dbe7f4;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: 800;
+                min-width: 24px;
+                min-height: 24px;
+                max-width: 24px;
+                max-height: 24px;
+            }
+            QLabel#stepTitle {
+                color: #f6f8fb;
+                font-size: 13px;
+                font-weight: 700;
+            }
+            QLabel#stepHint {
+                color: #9fb0c4;
+                font-size: 11px;
+            }
+            QFrame#panel {
+                background-color: #fbfcfe;
+                border: 1px solid #d8e2ed;
+                border-radius: 12px;
+            }
+            QFrame#summaryBlock {
+                background-color: #f3f7fb;
+                border: 1px solid #d8e2ed;
+                border-radius: 9px;
+            }
+            QFrame#statusPanel {
+                background-color: #e7f0fb;
+                border: 1px solid #bdd2ec;
+                border-radius: 12px;
+            }
+            QLabel#panelTitle {
+                color: #102033;
+                font-size: 15px;
+                font-weight: 800;
+            }
+            QLabel#panelCaption {
+                color: #5f6f82;
+                font-size: 12px;
+            }
+            QLabel#fieldLabel {
+                color: #37475a;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QLabel#mutedText {
+                color: #6d7c8f;
+                font-size: 12px;
+            }
+            QLabel#statusText {
+                color: #173b62;
+                font-size: 14px;
+                font-weight: 800;
+            }
+            QLabel#summaryValue {
+                color: #102033;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            QLabel#summaryLabel {
+                color: #607185;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            QLineEdit, QSpinBox, QComboBox {
+                min-height: 34px;
+                padding: 5px 9px;
+                border: 1px solid #c6d2df;
+                border-radius: 8px;
+                background-color: #ffffff;
+                color: #102033;
+                selection-background-color: #2563eb;
+            }
+            QLineEdit:focus, QSpinBox:focus, QComboBox:focus {
+                border: 1px solid #2563eb;
+                background-color: #ffffff;
+            }
+            QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {
+                background-color: #eef2f6;
+                color: #8a98a8;
+                border-color: #d8e2ed;
+            }
+            QCheckBox {
+                color: #37475a;
+                spacing: 8px;
+                font-weight: 600;
+            }
+            QCheckBox:disabled {
+                color: #8a98a8;
+            }
+            QPushButton {
+                min-height: 38px;
+                padding: 7px 16px;
+                border: 1px solid transparent;
+                border-radius: 9px;
+                background-color: #2563eb;
+                color: #ffffff;
+                font-weight: 800;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #1d56d6;
+            }
+            QPushButton:pressed {
+                background-color: #1746ad;
+            }
+            QPushButton:focus {
+                border: 1px solid #102033;
+            }
+            QPushButton:disabled {
+                background-color: #d8e2ed;
+                color: #7d8c9f;
+            }
+            QPushButton#secondaryButton {
+                background-color: #ffffff;
+                color: #173b62;
+                border: 1px solid #c6d2df;
+            }
+            QPushButton#secondaryButton:hover {
+                background-color: #f2f6fb;
+                border-color: #9fb4cc;
+            }
+            QPushButton#successButton {
+                background-color: #059669;
+                color: #ffffff;
+            }
+            QPushButton#successButton:hover {
+                background-color: #047857;
+            }
+            QPushButton#warningButton {
+                background-color: #b7791f;
+                color: #ffffff;
+            }
+            QPushButton#warningButton:hover {
+                background-color: #966513;
+            }
+            QPushButton#dangerButton {
+                background-color: #d14343;
+                color: #ffffff;
+            }
+            QPushButton#dangerButton:hover {
+                background-color: #b83232;
+            }
+            QProgressBar {
+                min-height: 18px;
+                border: 1px solid #c6d2df;
+                border-radius: 8px;
+                background-color: #f4f7fa;
+                text-align: center;
+                color: #173b62;
+                font-weight: 700;
+            }
+            QProgressBar::chunk {
+                background-color: #059669;
+                border-radius: 7px;
+            }
+            QTextEdit {
+                background-color: #111827;
+                color: #d5dde8;
+                border: 1px solid #233044;
+                border-radius: 10px;
+                padding: 10px;
+                font-family: Consolas, "Cascadia Mono", monospace;
+                font-size: 12px;
+                line-height: 1.5;
+            }
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollArea > QWidget > QWidget {
+                background-color: transparent;
+            }
+        """)
+
+    def make_panel(self, title: str, caption: str = "") -> tuple:
+        panel = QFrame()
+        panel.setObjectName("panel")
+        panel_layout = QVBoxLayout()
+        panel_layout.setContentsMargins(16, 14, 16, 16)
+        panel_layout.setSpacing(12)
+
+        header_layout = QVBoxLayout()
+        header_layout.setSpacing(2)
+        title_label = QLabel(title)
+        title_label.setObjectName("panelTitle")
+        header_layout.addWidget(title_label)
+        if caption:
+            caption_label = QLabel(caption)
+            caption_label.setObjectName("panelCaption")
+            caption_label.setWordWrap(True)
+            header_layout.addWidget(caption_label)
+        panel_layout.addLayout(header_layout)
+        panel.setLayout(panel_layout)
+        return panel, panel_layout
+
+    def make_field_label(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setObjectName("fieldLabel")
+        return label
+
+    def add_field(self, layout, row: int, column: int, label_text: str, widget, column_span: int = 1):
+        layout.addWidget(self.make_field_label(label_text), row, column)
+        layout.addWidget(widget, row + 1, column, 1, column_span)
+
+    def make_field_block(self, label_text: str, widget) -> QWidget:
+        block = QWidget()
+        block_layout = QVBoxLayout()
+        block_layout.setContentsMargins(0, 0, 0, 0)
+        block_layout.setSpacing(4)
+        block_layout.addWidget(self.make_field_label(label_text))
+        block_layout.addWidget(widget)
+        block.setLayout(block_layout)
+        return block
+
+    def create_step_item(self, number: str, title: str, hint: str) -> QFrame:
+        item = QFrame()
+        item.setObjectName("stepItem")
+        item_layout = QHBoxLayout()
+        item_layout.setContentsMargins(10, 10, 10, 10)
+        item_layout.setSpacing(10)
+
+        number_label = QLabel(number)
+        number_label.setObjectName("stepNumber")
+        number_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+        title_label = QLabel(title)
+        title_label.setObjectName("stepTitle")
+        hint_label = QLabel(hint)
+        hint_label.setObjectName("stepHint")
+        hint_label.setWordWrap(True)
+        text_layout.addWidget(title_label)
+        text_layout.addWidget(hint_label)
+
+        item_layout.addWidget(number_label)
+        item_layout.addLayout(text_layout)
+        item.setLayout(item_layout)
+        return item
+
+    def make_summary_block(self, label_text: str, value_text: str) -> tuple:
+        block = QFrame()
+        block.setObjectName("summaryBlock")
+        block_layout = QVBoxLayout()
+        block_layout.setContentsMargins(10, 8, 10, 8)
+        block_layout.setSpacing(2)
+        label = QLabel(label_text)
+        label.setObjectName("summaryLabel")
+        value = QLabel(value_text)
+        value.setObjectName("summaryValue")
+        value.setWordWrap(True)
+        block_layout.addWidget(label)
+        block_layout.addWidget(value)
+        block.setLayout(block_layout)
+        return block, value
+
+    def clean_display_text(self, text: str) -> str:
+        replacements = {
+            "🟢": "",
+            "✅": "",
+            "⚠️": "",
+            "⚠": "",
+            "💾": "",
+            "💡": "",
+            "⚡": "",
+            "🚀": "",
+            "🔄": "",
+            "⏸️": "",
+            "🎉": "",
+            "📁": "",
+        }
+        cleaned = str(text or "")
+        for old, new in replacements.items():
+            cleaned = cleaned.replace(old, new)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    def update_summary(self):
+        if not hasattr(self, "summary_file_label"):
+            return
+        file_text = os.path.basename(self.selected_file) if self.selected_file else "未选择"
+        self.summary_file_label.setText(file_text)
+        self.summary_pages_label.setText(f"{self.start_page_spin.value()}-{self.end_page_spin.value()}")
+        self.summary_level_label.setText(self.level_combo.currentText())
+        self.summary_progress_label.setText(f"{self.progress_bar.value()}%")
+
     def initUI(self):
         self.setWindowTitle('pdf2anki 医学 PDF 转 Anki 卡片工作站')
-        self.resize(1180, 780)
-
-        self.setStyleSheet("""
-            QWidget { color: #333333; font-family: 'Microsoft YaHei', 'Segoe UI'; font-size: 13px; }
-            QMainWindow { background-color: #f4f5f7; }
-            QGroupBox { border: 1px solid #dcdfe6; border-radius: 6px; margin-top: 15px; padding-top: 15px; background: #ffffff; font-weight: bold; }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; color: #1890ff; padding: 0 5px; }
-            QLineEdit, QSpinBox, QComboBox { padding: 6px; border: 1px solid #c0c4cc; border-radius: 4px; background: #ffffff; color: #333333; }
-            QPushButton { background-color: #1890ff; color: #ffffff; border: none; border-radius: 4px; padding: 8px 15px; font-weight: bold; font-size: 14px; }
-            QPushButton:hover { background-color: #40a9ff; }
-            QPushButton:disabled { background-color: #a0cfff; color: #f0f2f5; }
-            QProgressBar { border: 1px solid #dcdfe6; border-radius: 5px; background-color: #ffffff; text-align: center; color: #333333; }
-            QProgressBar::chunk { background-color: #52c41a; border-radius: 4px; }
-            QTextEdit { background-color: #ffffff; color: #333333; border: 1px solid #dcdfe6; border-radius: 6px; padding: 10px; font-family: Consolas, monospace; line-height: 1.5; }
-        """)
+        self.resize(1280, 820)
+        self.setMinimumSize(1120, 720)
+        self.apply_theme()
 
         main_widget = QWidget()
         outer_layout = QHBoxLayout()
-        outer_layout.setContentsMargins(20, 20, 20, 20)
-        outer_layout.setSpacing(15)
-        layout = QVBoxLayout()
-        layout.setSpacing(15)
-        side_layout = QVBoxLayout()
-        side_layout.setSpacing(15)
+        outer_layout.setContentsMargins(18, 18, 18, 18)
+        outer_layout.setSpacing(14)
+
+        rail = QFrame()
+        rail.setObjectName("leftRail")
+        rail.setFixedWidth(210)
+        rail_layout = QVBoxLayout()
+        rail_layout.setContentsMargins(16, 18, 16, 18)
+        rail_layout.setSpacing(14)
+
+        title_label = QLabel("pdf2anki")
+        title_label.setObjectName("appTitle")
+        subtitle_label = QLabel("医学 PDF 转 Anki Cloze 卡片工作站")
+        subtitle_label.setObjectName("appSubtitle")
+        subtitle_label.setWordWrap(True)
+        rail_layout.addWidget(title_label)
+        rail_layout.addWidget(subtitle_label)
+        rail_layout.addSpacing(10)
+
+        stage_label = QLabel("WORKFLOW")
+        stage_label.setObjectName("railSectionLabel")
+        rail_layout.addWidget(stage_label)
+        self.step_pdf = self.create_step_item("1", "选择 PDF", "载入教材、指南或论文")
+        self.step_config = self.create_step_item("2", "配置模型", "文本与视觉接口")
+        self.step_generate = self.create_step_item("3", "生成卡片", "断点续跑与导出")
+        rail_layout.addWidget(self.step_pdf)
+        rail_layout.addWidget(self.step_config)
+        rail_layout.addWidget(self.step_generate)
+        rail_layout.addStretch()
+
+        rail_note = QLabel("先用 3-5 页小范围试跑，确认 OCR 与 Cloze 质量后再处理整本资料。")
+        rail_note.setObjectName("appSubtitle")
+        rail_note.setWordWrap(True)
+        rail_layout.addWidget(rail_note)
+        rail.setLayout(rail_layout)
+
+        center_column = QWidget()
+        center_column_layout = QVBoxLayout()
+        center_column_layout.setContentsMargins(0, 0, 0, 0)
+        center_column_layout.setSpacing(12)
+
+        center_content = QWidget()
+        center_layout = QVBoxLayout()
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(12)
 
         status_frame = QFrame()
-        status_frame.setStyleSheet(
-            "background-color: #e6f7ff; border: 1px solid #91d5ff; border-radius: 6px; padding: 10px;")
+        status_frame.setObjectName("statusPanel")
         status_layout = QHBoxLayout()
-        self.global_status_label = QLabel("🟢 系统就绪 | 请先选择 PDF 文档并配置 API")
-        self.global_status_label.setStyleSheet("color: #0050b3; font-weight: bold; font-size: 14px;")
-        status_layout.addWidget(self.global_status_label)
+        status_layout.setContentsMargins(16, 12, 16, 12)
+        status_layout.setSpacing(12)
+        status_text_layout = QVBoxLayout()
+        status_text_layout.setSpacing(2)
+        status_caption = QLabel("当前状态")
+        status_caption.setObjectName("summaryLabel")
+        self.global_status_label = QLabel("系统就绪，请选择 PDF 并确认 API 配置。")
+        self.global_status_label.setObjectName("statusText")
+        self.global_status_label.setWordWrap(True)
+        status_text_layout.addWidget(status_caption)
+        status_text_layout.addWidget(self.global_status_label)
+        self.status_meta_label = QLabel("配置会自动保存到本地，生成过程支持暂停和断点继续。")
+        self.status_meta_label.setObjectName("mutedText")
+        self.status_meta_label.setWordWrap(True)
+        status_layout.addLayout(status_text_layout, 1)
+        status_layout.addWidget(self.status_meta_label, 0)
         status_frame.setLayout(status_layout)
-        layout.addWidget(status_frame)
+        center_layout.addWidget(status_frame)
 
-        config_group = QGroupBox("⚙️ API 与策略配置")
-        config_layout = QVBoxLayout()
-        config_layout.setSpacing(15)
+        task_panel, task_layout = self.make_panel("任务输入", "选择来源 PDF，并设置本次生成的页码范围和学习深度。")
+        task_grid = QGridLayout()
+        task_grid.setHorizontalSpacing(12)
+        task_grid.setVerticalSpacing(8)
 
-        text_api_layout = QHBoxLayout()
+        self.btn_select = QPushButton("选择教材 PDF")
+        self.btn_select.setObjectName("secondaryButton")
+        self.btn_select.setMinimumWidth(150)
+        self.btn_select.clicked.connect(self.select_file)
+
+        file_box = QFrame()
+        file_box.setObjectName("panel")
+        file_box_layout = QVBoxLayout()
+        file_box_layout.setContentsMargins(12, 8, 12, 8)
+        file_box_layout.setSpacing(4)
+        file_caption = QLabel("已选择文件")
+        file_caption.setObjectName("summaryLabel")
+        self.file_label = QLabel("未载入文件")
+        self.file_label.setObjectName("summaryValue")
+        self.file_label.setWordWrap(True)
+        self.resume_badge = QLabel("")
+        self.resume_badge.setObjectName("mutedText")
+        self.resume_badge.setWordWrap(True)
+        file_box_layout.addWidget(file_caption)
+        file_box_layout.addWidget(self.file_label)
+        file_box_layout.addWidget(self.resume_badge)
+        file_box.setLayout(file_box_layout)
+
+        self.start_page_spin = QSpinBox()
+        self.start_page_spin.setRange(1, 9999)
+        self.start_page_spin.setValue(1)
+        self.start_page_spin.valueChanged.connect(self.check_resume_state)
+        self.start_page_spin.valueChanged.connect(self.update_summary)
+        self.end_page_spin = QSpinBox()
+        self.end_page_spin.setRange(1, 9999)
+        self.end_page_spin.setValue(9999)
+        self.end_page_spin.valueChanged.connect(self.check_resume_state)
+        self.end_page_spin.valueChanged.connect(self.update_summary)
+        self.level_combo = QComboBox()
+        self.level_combo.addItems(["简单学习", "充分学习"])
+        self.level_combo.currentTextChanged.connect(self.check_resume_state)
+        self.level_combo.currentTextChanged.connect(self.update_summary)
+
+        task_grid.addWidget(self.btn_select, 0, 0, 2, 1)
+        task_grid.addWidget(file_box, 0, 1, 2, 3)
+        self.add_field(task_grid, 2, 0, "起始页", self.start_page_spin)
+        self.add_field(task_grid, 2, 1, "结束页", self.end_page_spin)
+        self.add_field(task_grid, 2, 2, "学习深度", self.level_combo, 2)
+        task_grid.setColumnStretch(1, 1)
+        task_grid.setColumnStretch(2, 1)
+        task_grid.setColumnStretch(3, 1)
+        task_layout.addLayout(task_grid)
+        center_layout.addWidget(task_panel)
+
+        config_panel, config_layout = self.make_panel("API 与策略配置", "文本模型负责知识抽取与卡片生成；视觉/OCR 用于扫描页、表格和流程图。")
+
         self.text_api_key_input = QLineEdit()
         self.text_api_key_input.setPlaceholderText("文本模型 API Key")
         self.text_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.text_model_input = QLineEdit()
-        self.text_model_input.setPlaceholderText("文本模型名称，如 gpt-4o-mini")
-        self.text_model_input.setFixedWidth(260)
-        text_api_layout.addWidget(QLabel("文本 API Key:"))
-        text_api_layout.addWidget(self.text_api_key_input)
-        text_api_layout.addWidget(QLabel("模型:"))
-        text_api_layout.addWidget(self.text_model_input)
-        config_layout.addLayout(text_api_layout)
-
-        text_base_layout = QHBoxLayout()
-        self.text_use_proxy_checkbox = QCheckBox("文本接口使用代理/中转站")
+        self.text_model_input.setPlaceholderText("如 gpt-4o-mini")
+        self.text_use_proxy_checkbox = QCheckBox("文本使用代理")
         self.text_proxy_url_input = QLineEdit()
-        self.text_proxy_url_input.setPlaceholderText("代理 Base URL，例如 https://api.example.com/v1")
+        self.text_proxy_url_input.setPlaceholderText("文本代理 Base URL")
         self.text_base_url_input = QLineEdit()
-        self.text_base_url_input.setPlaceholderText("官方 Base URL，例如 https://api.openai.com/v1")
-        text_base_layout.addWidget(self.text_use_proxy_checkbox)
-        text_base_layout.addWidget(QLabel("官方/默认地址:"))
-        text_base_layout.addWidget(self.text_base_url_input)
-        text_base_layout.addWidget(QLabel("代理地址:"))
-        text_base_layout.addWidget(self.text_proxy_url_input)
-        config_layout.addLayout(text_base_layout)
+        self.text_base_url_input.setPlaceholderText("https://api.openai.com/v1")
 
-        vision_api_layout = QHBoxLayout()
         self.vision_reuse_text_checkbox = QCheckBox("视觉/OCR 复用文本接口")
         self.vision_api_key_input = QLineEdit()
-        self.vision_api_key_input.setPlaceholderText("视觉/OCR API Key（不复用时填写）")
+        self.vision_api_key_input.setPlaceholderText("不复用时填写")
         self.vision_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.vision_model_input = QLineEdit()
-        self.vision_model_input.setPlaceholderText("视觉模型名称，如 gpt-4o-mini / 兼容视觉模型")
-        self.vision_model_input.setFixedWidth(260)
-        vision_api_layout.addWidget(self.vision_reuse_text_checkbox)
-        vision_api_layout.addWidget(QLabel("视觉 Key:"))
-        vision_api_layout.addWidget(self.vision_api_key_input)
-        vision_api_layout.addWidget(QLabel("模型:"))
-        vision_api_layout.addWidget(self.vision_model_input)
-        config_layout.addLayout(vision_api_layout)
-
-        vision_base_layout = QHBoxLayout()
-        self.vision_use_proxy_checkbox = QCheckBox("视觉接口使用代理/中转站")
+        self.vision_model_input.setPlaceholderText("视觉模型名称")
+        self.vision_use_proxy_checkbox = QCheckBox("视觉使用代理")
         self.vision_proxy_url_input = QLineEdit()
-        self.vision_proxy_url_input.setPlaceholderText("视觉代理 Base URL，例如 https://api.example.com/v1")
+        self.vision_proxy_url_input.setPlaceholderText("视觉代理 Base URL")
         self.vision_base_url_input = QLineEdit()
-        self.vision_base_url_input.setPlaceholderText("视觉官方 Base URL，例如 https://api.openai.com/v1")
-        vision_base_layout.addWidget(self.vision_use_proxy_checkbox)
-        vision_base_layout.addWidget(QLabel("官方/默认地址:"))
-        vision_base_layout.addWidget(self.vision_base_url_input)
-        vision_base_layout.addWidget(QLabel("代理地址:"))
-        vision_base_layout.addWidget(self.vision_proxy_url_input)
-        config_layout.addLayout(vision_base_layout)
+        self.vision_base_url_input.setPlaceholderText("https://api.openai.com/v1")
+
+        text_header = QLabel("文本模型")
+        text_header.setObjectName("panelTitle")
+        vision_header = QLabel("视觉 / OCR")
+        vision_header.setObjectName("panelTitle")
+
+        text_first_row = QHBoxLayout()
+        text_first_row.setSpacing(10)
+        text_first_row.addWidget(self.make_field_block("API Key", self.text_api_key_input), 1)
+        text_first_row.addWidget(self.make_field_block("模型", self.text_model_input), 1)
+        text_url_row = QHBoxLayout()
+        text_url_row.setSpacing(10)
+        text_url_row.addWidget(self.make_field_block("官方 Base URL", self.text_base_url_input), 1)
+        text_url_row.addWidget(self.make_field_block("代理 Base URL", self.text_proxy_url_input), 1)
+
+        vision_first_row = QHBoxLayout()
+        vision_first_row.setSpacing(10)
+        vision_first_row.addWidget(self.make_field_block("API Key", self.vision_api_key_input), 1)
+        vision_first_row.addWidget(self.make_field_block("模型", self.vision_model_input), 1)
+        vision_url_row = QHBoxLayout()
+        vision_url_row.setSpacing(10)
+        vision_url_row.addWidget(self.make_field_block("官方 Base URL", self.vision_base_url_input), 1)
+        vision_url_row.addWidget(self.make_field_block("代理 Base URL", self.vision_proxy_url_input), 1)
+
+        text_column = QVBoxLayout()
+        text_column.setSpacing(8)
+        text_column.addWidget(text_header)
+        text_column.addLayout(text_first_row)
+        text_column.addWidget(self.text_use_proxy_checkbox)
+        text_column.addLayout(text_url_row)
+
+        vision_column = QVBoxLayout()
+        vision_column.setSpacing(8)
+        vision_column.addWidget(vision_header)
+        vision_column.addWidget(self.vision_reuse_text_checkbox)
+        vision_column.addLayout(vision_first_row)
+        vision_column.addWidget(self.vision_use_proxy_checkbox)
+        vision_column.addLayout(vision_url_row)
+
+        config_columns = QHBoxLayout()
+        config_columns.setSpacing(18)
+        config_columns.addLayout(text_column, 1)
+        config_columns.addLayout(vision_column, 1)
+        config_layout.addLayout(config_columns)
 
         self.text_use_proxy_checkbox.stateChanged.connect(self.update_api_field_states)
         self.vision_use_proxy_checkbox.stateChanged.connect(self.update_api_field_states)
         self.vision_reuse_text_checkbox.stateChanged.connect(self.update_api_field_states)
+        center_layout.addWidget(config_panel)
 
-        param_layout = QHBoxLayout()
-        param_layout.addWidget(QLabel("截取页码: 从"))
-        self.start_page_spin = QSpinBox()
-        self.start_page_spin.setRange(1, 9999)
-        self.start_page_spin.setValue(1)
-        param_layout.addWidget(self.start_page_spin)
-
-        param_layout.addWidget(QLabel("到"))
-        self.end_page_spin = QSpinBox()
-        self.end_page_spin.setRange(1, 9999)
-        self.end_page_spin.setValue(9999)
-        param_layout.addWidget(self.end_page_spin)
-
-        param_layout.addSpacing(20)
-        param_layout.addWidget(QLabel("学习深度:"))
-        self.level_combo = QComboBox()
-        self.level_combo.addItems(["简单学习", "充分学习"])
-        self.level_combo.currentTextChanged.connect(self.check_resume_state)
-        param_layout.addWidget(self.level_combo)
-        param_layout.addStretch()
-
-        config_layout.addLayout(param_layout)
-        config_group.setLayout(config_layout)
-        layout.addWidget(config_group)
-
-        file_layout = QHBoxLayout()
-        self.btn_select = QPushButton("📁 选择教材 PDF")
-        self.btn_select.setMinimumWidth(150)
-        self.btn_select.clicked.connect(self.select_file)
-
-        self.file_label = QLabel("未载入文件")
-        self.file_label.setStyleSheet("color: #7f8c8d;")
-
-        self.resume_badge = QLabel("")
-        self.resume_badge.setStyleSheet("color: #d32f2f; font-weight: bold; margin-left: 15px;")
-
-        file_layout.addWidget(self.btn_select)
-        file_layout.addWidget(self.file_label)
-        file_layout.addWidget(self.resume_badge)
-        file_layout.addStretch()
-        layout.addLayout(file_layout)
+        run_panel, run_layout = self.make_panel("生成控制", "进度、日志和断点续跑集中在这里。")
 
         self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(22)
         self.progress_bar.setValue(0)
-        layout.addWidget(self.progress_bar)
+        run_layout.addWidget(self.progress_bar)
 
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
-        layout.addWidget(self.log_area)
+        self.log_area.setMinimumHeight(96)
+        self.log_area.setMaximumHeight(120)
+        run_layout.addWidget(self.log_area, 1)
 
         control_layout = QHBoxLayout()
+        control_layout.setSpacing(10)
 
-        self.btn_start = QPushButton("🚀 开始生成卡片")
-        self.btn_start.setFixedHeight(45)
+        self.btn_start = QPushButton("开始生成卡片")
+        self.btn_start.setMinimumHeight(42)
         self.btn_start.clicked.connect(lambda: self.start_processing(resume=False))
 
-        self.btn_resume = QPushButton("⚡ 继续断点")
-        self.btn_resume.setFixedHeight(45)
-        self.btn_resume.setStyleSheet("background-color: #52c41a;")
+        self.btn_resume = QPushButton("继续断点")
+        self.btn_resume.setObjectName("successButton")
+        self.btn_resume.setMinimumHeight(42)
         self.btn_resume.clicked.connect(lambda: self.start_processing(resume=True))
         self.btn_resume.setVisible(False)
 
-        self.btn_stop = QPushButton("⏸️ 暂停任务")
-        self.btn_stop.setFixedHeight(45)
-        self.btn_stop.setStyleSheet("background-color: #f56c6c;")
+        self.btn_stop = QPushButton("暂停任务")
+        self.btn_stop.setObjectName("dangerButton")
+        self.btn_stop.setMinimumHeight(42)
         self.btn_stop.clicked.connect(self.stop_processing)
         self.btn_stop.setEnabled(False)
 
-        control_layout.addWidget(self.btn_start)
+        control_layout.addStretch()
         control_layout.addWidget(self.btn_resume)
         control_layout.addWidget(self.btn_stop)
-        layout.addLayout(control_layout)
+        control_layout.addWidget(self.btn_start)
+        run_layout.addLayout(control_layout)
 
-        preview_group = QGroupBox("👁️ 实时识图")
-        preview_group.setFixedWidth(285)
-        preview_layout = QVBoxLayout()
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(12)
+
+        summary_panel, summary_layout = self.make_panel("运行摘要", "快速确认本次任务的关键状态。")
+        summary_grid = QGridLayout()
+        summary_grid.setHorizontalSpacing(8)
+        summary_grid.setVerticalSpacing(8)
+        file_summary, self.summary_file_label = self.make_summary_block("文件", "未选择")
+        page_summary, self.summary_pages_label = self.make_summary_block("页码", "1-9999")
+        level_summary, self.summary_level_label = self.make_summary_block("学习深度", "简单学习")
+        progress_summary, self.summary_progress_label = self.make_summary_block("进度", "0%")
+        summary_grid.addWidget(file_summary, 0, 0)
+        summary_grid.addWidget(page_summary, 0, 1)
+        summary_grid.addWidget(level_summary, 1, 0)
+        summary_grid.addWidget(progress_summary, 1, 1)
+        summary_layout.addLayout(summary_grid)
+        right_layout.addWidget(summary_panel)
+
+        preview_group, preview_layout = self.make_panel("实时识图", "OCR、表格或流程图视觉解析时会显示页面预览。")
+        preview_group.setFixedWidth(310)
         self.preview_title_label = QLabel("尚未开始视觉解析")
         self.preview_title_label.setWordWrap(True)
-        self.preview_title_label.setStyleSheet("color: #64748b; font-weight: bold;")
+        self.preview_title_label.setObjectName("summaryValue")
         self.preview_image_label = QLabel("OCR/表格/流程图识别时显示")
         self.preview_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview_image_label.setMinimumSize(245, 180)
-        self.preview_image_label.setMaximumHeight(260)
+        self.preview_image_label.setMinimumSize(270, 210)
+        self.preview_image_label.setMaximumHeight(300)
         self.preview_image_label.setStyleSheet(
-            "background:#f8fafc; border:1px dashed #cbd5e1; border-radius:6px; color:#94a3b8; padding:8px;"
+            "background:#f4f7fa; border:1px dashed #b8c6d6; border-radius:10px; color:#7d8c9f; padding:10px;"
         )
         preview_layout.addWidget(self.preview_title_label)
         preview_layout.addWidget(self.preview_image_label)
         preview_layout.addStretch()
-        preview_group.setLayout(preview_layout)
-        side_layout.addWidget(preview_group)
-        side_layout.addStretch()
+        right_layout.addWidget(preview_group, 1)
 
-        outer_layout.addLayout(layout, 1)
-        outer_layout.addLayout(side_layout, 0)
+        center_content.setLayout(center_layout)
+        center_scroll = QScrollArea()
+        center_scroll.setWidgetResizable(True)
+        center_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        center_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        center_scroll.setWidget(center_content)
+        center_column_layout.addWidget(center_scroll, 1)
+        center_column_layout.addWidget(run_panel, 0)
+        center_column.setLayout(center_column_layout)
+        outer_layout.addWidget(rail)
+        outer_layout.addWidget(center_column, 1)
+        outer_layout.addLayout(right_layout, 0)
         main_widget.setLayout(outer_layout)
         self.setCentralWidget(main_widget)
         self.selected_file = None
         self.thread = None
+        self.update_summary()
 
     def apply_config(self):
         self.text_api_key_input.setText(str(self.config.get("text_api_key", "")))
@@ -1635,7 +2064,8 @@ class MainWindow(QMainWindow):
             self.level_combo.setCurrentIndex(index)
         self.update_api_field_states()
         if self.text_api_key_input.text():
-            self.global_status_label.setText("🟢 已载入本地配置 | 请选择 PDF 文档开始生成")
+            self.update_global_status("已载入本地配置，请选择 PDF 文档开始生成。")
+        self.update_summary()
 
     def collect_config(self) -> dict:
         return {
@@ -1693,11 +2123,14 @@ class MainWindow(QMainWindow):
         self.vision_base_url_input.setEnabled((not reuse_text) and (not self.vision_use_proxy_checkbox.isChecked()))
         self.vision_proxy_url_input.setEnabled((not reuse_text) and self.vision_use_proxy_checkbox.isChecked())
         self.vision_model_input.setEnabled(True)
+        self.status_meta_label.setText(
+            "视觉/OCR 当前复用文本接口。" if reuse_text else "视觉/OCR 使用独立接口配置。"
+        )
 
     def save_config(self):
         try:
             AppConfig.save(self.collect_config())
-            self.log("info", "💾 已保存 API 与默认策略配置到 pdf2anki_config.json")
+            self.log("info", "已保存 API 与默认策略配置到 pdf2anki_config.json")
         except Exception as e:
             self.log("warning", f"配置保存失败: {e}")
 
@@ -1705,10 +2138,13 @@ class MainWindow(QMainWindow):
         self.resume_page = None
         self.resume_badge.setText("")
         self.btn_resume.setVisible(False)
-        self.btn_start.setText("🚀 开始生成卡片")
-        self.btn_start.setStyleSheet("background-color: #1890ff; color: #ffffff;")
+        self.btn_start.setText("开始生成卡片")
+        self.btn_start.setObjectName("")
+        self.btn_start.style().unpolish(self.btn_start)
+        self.btn_start.style().polish(self.btn_start)
 
         if not self.selected_file:
+            self.update_summary()
             return
 
         task_id = f"{os.path.basename(self.selected_file)}_{self.level_combo.currentText()}"
@@ -1723,49 +2159,64 @@ class MainWindow(QMainWindow):
                 next_page = row[0] + 1
                 if next_page <= self.end_page_spin.value():
                     self.resume_page = next_page
-                    self.resume_badge.setText(f"💡 发现本地记录：上次成功处理至第 {row[0]} 页")
-                    self.btn_resume.setText(f"⚡ 从第 {self.resume_page} 页继续生成")
+                    self.resume_badge.setText(f"发现本地记录：上次成功处理至第 {row[0]} 页")
+                    self.btn_resume.setText(f"从第 {self.resume_page} 页继续生成")
                     self.btn_resume.setVisible(True)
-                    self.btn_start.setText("🔄 覆盖记录，从头重新开始")
-                    self.btn_start.setStyleSheet("background-color: #faad14; color: #ffffff;")
+                    self.btn_start.setText("覆盖记录，从头重新开始")
+                    self.btn_start.setObjectName("warningButton")
+                    self.btn_start.style().unpolish(self.btn_start)
+                    self.btn_start.style().polish(self.btn_start)
         except Exception as e:
             pass
+        self.update_summary()
 
     def select_file(self):
         fname, _ = QFileDialog.getOpenFileName(self, '选择PDF', '', 'PDF Files (*.pdf)')
         if fname:
             self.selected_file = fname
             self.file_label.setText(os.path.basename(fname))
-            self.file_label.setStyleSheet("color: #2c3e50; font-weight: bold;")
             self.check_resume_state()
+            self.update_global_status("PDF 已载入，请确认模型配置并开始生成。")
 
     def update_global_status(self, text):
-        self.global_status_label.setText(text)
+        self.global_status_label.setText(self.clean_display_text(text))
 
     def log(self, level, text):
         time_str = datetime.now().strftime('%H:%M:%S')
         if level == "error":
-            color = "#d32f2f"
+            color = "#fca5a5"
+            label = "ERROR"
         elif level == "success":
-            color = "#2e7d32"
+            color = "#86efac"
+            label = "OK"
         elif level == "warning":
-            color = "#ed6c02"
+            color = "#facc15"
+            label = "WARN"
         else:
-            color = "#1976d2"
+            color = "#93c5fd"
+            label = "INFO"
 
-        formatted_text = f"<span style='color: #9e9e9e;'>[{time_str}]</span> <span style='color: {color}; font-weight: bold;'>{text}</span>"
+        safe_text = html.escape(self.clean_display_text(text))
+        formatted_text = (
+            f"<span style='color: #7d8da5;'>[{time_str}]</span> "
+            f"<span style='color: {color}; font-weight: bold;'>[{label}]</span> "
+            f"<span style='color: #d5dde8;'>{safe_text}</span>"
+        )
         self.log_area.append(formatted_text)
         self.log_area.moveCursor(QTextCursor.MoveOperation.End)
 
     def update_progress(self, val, text):
         self.progress_bar.setValue(val)
+        self.update_summary()
+        if text:
+            self.status_meta_label.setText(self.clean_display_text(text))
 
     def update_preview(self, image_bytes, title):
         pixmap = QPixmap()
         if not pixmap.loadFromData(image_bytes):
             self.preview_title_label.setText("图像预览加载失败")
             return
-        self.preview_title_label.setText(title)
+        self.preview_title_label.setText(self.clean_display_text(title))
         target_size = self.preview_image_label.size()
         scaled = pixmap.scaled(
             target_size,
@@ -1776,10 +2227,12 @@ class MainWindow(QMainWindow):
 
     def start_processing(self, resume=False):
         if not self.selected_file:
-            self.log("error", "⚠️ 请先选择 PDF 文件")
+            self.log("error", "请先选择 PDF 文件")
+            self.update_global_status("缺少 PDF 文件，请先选择教材或论文。")
             return
         if not self.text_api_key_input.text().strip():
-            self.log("error", "⚠️ 请输入文本模型 API Key")
+            self.log("error", "请输入文本模型 API Key")
+            self.update_global_status("缺少文本模型 API Key，请补全配置。")
             return
         self.save_config()
 
@@ -1792,7 +2245,7 @@ class MainWindow(QMainWindow):
                 cursor.execute("DELETE FROM cards WHERE task_id = ?", (task_id,))
                 conn.commit()
                 conn.close()
-                self.log("warning", "🔄 已清理该文档的历史缓存数据，重新开始生成。")
+                self.log("warning", "已清理该文档的历史缓存数据，重新开始生成。")
                 self.resume_page = None
             except Exception as e:
                 self.log("error", f"清理缓存失败: {e}")
@@ -1802,6 +2255,13 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(True)
         self.btn_select.setEnabled(False)
         self.level_combo.setEnabled(False)
+        self.start_page_spin.setEnabled(False)
+        self.end_page_spin.setEnabled(False)
+        self.update_global_status("任务运行中，正在生成 Anki Cloze 卡片。")
+        self.status_meta_label.setText(
+            f"范围 {self.start_page_spin.value()}-{self.end_page_spin.value()} 页，模式：{self.level_combo.currentText()}。"
+        )
+        self.update_summary()
 
         self.thread = ProcessingThread(
             self.selected_file,
@@ -1826,8 +2286,11 @@ class MainWindow(QMainWindow):
             self.btn_stop.setEnabled(False)
             self.btn_select.setEnabled(True)
             self.level_combo.setEnabled(True)
-            self.update_global_status("⏸️ 任务已手动暂停，随时可继续")
+            self.start_page_spin.setEnabled(True)
+            self.end_page_spin.setEnabled(True)
+            self.update_global_status("任务已手动暂停，随时可继续。")
             self.check_resume_state()
+            self.update_summary()
 
     def on_finished(self, output_path):
         self.progress_bar.setValue(100)
@@ -1836,8 +2299,11 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.btn_select.setEnabled(True)
         self.level_combo.setEnabled(True)
-        self.update_global_status(f"🎉 全部搞定！已保存至: {os.path.basename(output_path)}")
-        self.log("success", f"🎉 任务圆满完成！Anki 包路径: {output_path}")
+        self.start_page_spin.setEnabled(True)
+        self.end_page_spin.setEnabled(True)
+        self.update_global_status(f"任务完成，已保存至: {os.path.basename(output_path)}")
+        self.log("success", f"任务完成。Anki 包路径: {output_path}")
+        self.update_summary()
 
 
 if __name__ == '__main__':

@@ -15,6 +15,7 @@ Turn medical PDFs into Anki Cloze cards with OCR, visual chart parsing, source t
 - Provider-agnostic OpenAI-compatible API settings.
 - Separate text and vision/OCR model settings, or reuse one multimodal API for both.
 - Proxy/relay-site support with independent proxy Base URL fields.
+- Guided PyQt6 workbench UI with a workflow rail, task summary, OCR preview, and clearer run log.
 - Local config saving in `pdf2anki_config.json`.
 - Resume support with local SQLite state.
 - Anki `.apkg` export with page number, source excerpt, knowledge type, and clinical note on the back.
@@ -44,12 +45,13 @@ py .\pdf2anki.py
 
 Then:
 
-1. Fill in a text-model API key, model name, and Base URL.
-2. If your text model is also vision-capable, keep `视觉/OCR 复用文本接口` checked.
-3. If you use a proxy or relay site, check the proxy option and enter the proxy Base URL.
-4. Select a medical PDF.
+1. Follow the left workflow rail: choose a PDF, configure models, then generate cards.
+2. Fill in a text-model API key, model name, and Base URL.
+3. If your text model is also vision-capable, keep `视觉/OCR 复用文本接口` checked.
+4. If you use a proxy or relay site, check `文本使用代理` or `视觉使用代理` and enter the proxy Base URL.
 5. Start with a small page range, such as 3-5 pages.
-6. Generate the `.apkg` file and import it into Anki.
+6. Watch the right-side run summary and OCR preview while cards are generated.
+7. Import the generated `.apkg` file into Anki.
 
 ## API Configuration
 
@@ -62,7 +64,7 @@ For a direct official endpoint:
 
 For a proxy or relay site:
 
-- Check `文本接口使用代理/中转站` or `视觉接口使用代理/中转站`.
+- Check `文本使用代理` or `视觉使用代理`.
 - Enter the proxy Base URL, for example `https://your-relay.example.com/v1`.
 - Do not include `/chat/completions` unless your provider explicitly requires it; the app normalizes both formats.
 

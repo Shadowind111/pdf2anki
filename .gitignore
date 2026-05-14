@@ -28,6 +28,7 @@ progress_cache/
 Thumbs.db
 .idea/
 .vscode/
+.superpowers/
 
 # Python environments
 .venv/

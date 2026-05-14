@@ -4,11 +4,12 @@
 
 1. Install dependencies with `py -m pip install -r requirements.txt`.
 2. Run `py .\pdf2anki.py`.
-3. Configure a text model API key, model name, and Base URL.
-4. If one API supports both text and images, keep `视觉/OCR 复用文本接口` enabled.
-5. If you use a proxy or relay site, enable the proxy checkbox and enter the proxy Base URL.
-6. Process 3-5 pages first and inspect the generated cards in Anki.
-7. Only process large books after confirming OCR, visual parsing, and cloze quality.
+3. Use the left workflow rail to move through the app: choose a PDF, configure models, then generate cards.
+4. Configure a text model API key, model name, and Base URL.
+5. If one API supports both text and images, keep `视觉/OCR 复用文本接口` enabled.
+6. If you use a proxy or relay site, enable `文本使用代理` or `视觉使用代理` and enter the proxy Base URL.
+7. Process 3-5 pages first, watching the right-side run summary and OCR preview.
+8. Only process large books after confirming OCR, visual parsing, and cloze quality in Anki.
 
 ## API Notes
 
@@ -18,6 +19,8 @@
 - Proxy Base URL example: `https://your-relay.example.com/v1`
 - The app accepts URLs with or without `/chat/completions`.
 - Vision/OCR requires a model and endpoint that supports `image_url` message content.
+- The right-side run summary mirrors the selected file, page range, learning depth, and progress.
+- The OCR preview panel updates only when a page is rendered for OCR or visual parsing.
 
 ## Card Quality Tips
 

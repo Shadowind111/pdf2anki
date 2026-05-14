@@ -33,6 +33,8 @@ Turn medical PDFs into Anki Cloze cards with OCR, visual chart parsing, source t
 - Confirm `pdf2anki_config.json` is not present.
 - Confirm `pdf2anki_state.db` is not present.
 - Confirm private PDFs and generated `.apkg` files are not present.
+- Confirm `.superpowers/` and local UI preview screenshots are not staged.
+- Run `py -m py_compile .\pdf2anki.py` after UI edits.
 - Create the GitHub repository as public or private.
 - Upload or push the contents of this folder.
 
