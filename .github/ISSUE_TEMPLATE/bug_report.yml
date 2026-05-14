@@ -1,0 +1,25 @@
+﻿name: Bug report
+description: Report a bug or failed generation case
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: Paste a non-sensitive example of the bad card or error log.
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes

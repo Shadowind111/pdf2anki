@@ -1,0 +1,16 @@
+{
+  "text_api_key": "YOUR_TEXT_MODEL_API_KEY",
+  "text_model": "gpt-4o-mini",
+  "text_base_url": "https://api.openai.com/v1",
+  "text_use_proxy": false,
+  "text_proxy_url": "https://your-text-proxy.example.com/v1",
+  "vision_reuse_text_api": true,
+  "vision_api_key": "",
+  "vision_model": "gpt-4o-mini",
+  "vision_base_url": "https://api.openai.com/v1",
+  "vision_use_proxy": false,
+  "vision_proxy_url": "https://your-vision-proxy.example.com/v1",
+  "start_page": 1,
+  "end_page": 20,
+  "learning_level": "简单学习"
+}

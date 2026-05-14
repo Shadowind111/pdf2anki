@@ -1,0 +1,22 @@
+﻿name: Cloze quality improvement
+description: Suggest a better medical cloze-generation rule
+title: "[Cloze]: "
+labels: [cloze-quality]
+body:
+  - type: textarea
+    id: bad
+    attributes:
+      label: Current bad card
+      description: Remove private/copyrighted text if needed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected better card
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why this is better

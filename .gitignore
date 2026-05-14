@@ -1,0 +1,35 @@
+# Secrets and local runtime config
+pdf2anki_config.json
+*.env
+.env
+
+# Runtime state and generated decks
+pdf2anki_state.db
+*.db
+*.sqlite
+*.sqlite3
+*.apkg
+
+# Source PDFs and private study materials
+*.pdf
+books/
+data/
+datasets/
+
+# Caches
+__pycache__/
+*.py[cod]
+chunks_cache/
+progress_cache/
+.cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python environments
+.venv/
+venv/
+env/
