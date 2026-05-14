@@ -930,8 +930,7 @@ class ProcessingThread(QThread):
                             self.log_update.emit("warning", f"整页视觉解析跳过: {visual_err}")
                         elif visual_text and "IGNORE_IMAGE" not in visual_text:
                             page_text += (
-                                "\n\n<div style='background:#fff7ed; padding:15px; border-radius:8px; "
-                                "border-left: 4px solid #f97316;'><strong>[整页图表/流程视觉解析]</strong><br>"
+                                "\n\n<div class='visual-note visual-note-page'><strong>整页图表/流程视觉解析</strong><br>"
                                 f"{visual_text}</div>\n\n"
                             )
                             self.log_update.emit("success", f"✅ 第 {page_num + 1} 页已补充整页图表/流程解析")
@@ -971,7 +970,7 @@ class ProcessingThread(QThread):
                                     elif "IGNORE_IMAGE" in img_desc:
                                         self.log_update.emit("warning", "已自动识别并丢弃无用图像(水印/Logo等)")
                                     elif img_desc:
-                                        page_text += f"\n\n<div style='background:#f8fafc; padding:15px; border-radius:8px; border-left: 4px solid #1890ff;'><strong>[图表解析与重构]</strong><br>{img_desc}</div>\n\n"
+                                        page_text += f"\n\n<div class='visual-note'><strong>图表解析与重构</strong><br>{img_desc}</div>\n\n"
 
                                     time.sleep(1.5)
                             pix = None
@@ -1028,54 +1027,327 @@ class ProcessingThread(QThread):
 
     def export_anki(self, task_id, conn):
         css = """
-        html, body { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background-color: #f0f4f8; overflow: hidden; 
-            font-family: -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
-            color: #2c3e50; display: flex; justify-content: center; align-items: center;
+        :root {
+            --surface: #fbfbf8;
+            --panel: #fffffc;
+            --panel-soft: #f4f4ef;
+            --ink: #1f2523;
+            --muted: #63706b;
+            --faint: #dcded5;
+            --line: #e7e8df;
+            --accent: #2f7667;
+            --accent-soft: #e3f0eb;
+            --accent-strong: #1f5d51;
+            --answer: #8b3f31;
+            --answer-soft: #f5e4de;
         }
-        .card-container { 
-            background: #ffffff; width: 90vw; height: 90vh; max-width: 1200px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08); border-radius: 16px;
-            border-top: 6px solid #1890ff; display: flex; flex-direction: column;
-            box-sizing: border-box; padding: 40px 50px; position: relative; overflow-y: auto; 
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #f3f3ee;
+            background: radial-gradient(circle at 18% 12%, #fffffc 0, #f5f4ef 34%, #ebece4 100%);
+            color: var(--ink);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+            font-kerning: normal;
         }
-        .card-container::-webkit-scrollbar { width: 0px; background: transparent; }
-        .content-area { font-size: 24px; line-height: 1.8; flex-grow: 1; }
-        .card-title {
-            font-size: 20px; font-weight: 700; color: #0f172a; margin-bottom: 14px;
-            padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
+
+        .card-shell {
+            width: min(92vw, 980px);
+            height: min(92vh, 1120px);
+            box-sizing: border-box;
+            padding: 14px;
+        }
+
+        .card-container {
+            background: var(--panel);
+            width: 100%;
+            height: 100%;
+            border: 1px solid rgba(31, 37, 35, 0.08);
+            border-radius: 22px;
+            box-shadow: 0 24px 70px rgba(36, 44, 40, 0.13), 0 2px 8px rgba(36, 44, 40, 0.06);
+            box-sizing: border-box;
+            padding: 34px 40px 28px;
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .card-container::before {
+            content: "";
+            position: sticky;
+            top: -34px;
+            display: block;
+            height: 5px;
+            margin: -34px -40px 28px;
+            background: linear-gradient(90deg, var(--accent), #8b6f47 56%, var(--answer));
+            opacity: 0.92;
+        }
+
+        .card-container::-webkit-scrollbar { width: 8px; }
+        .card-container::-webkit-scrollbar-track { background: transparent; }
+        .card-container::-webkit-scrollbar-thumb {
+            background: #d6d8cf;
+            border-radius: 99px;
+        }
+
+        .content-area {
+            max-width: 42rem;
+            margin: 0 auto;
+            font-size: 1.45rem;
+            line-height: 1.78;
+            letter-spacing: 0;
+            font-weight: 400;
+        }
+
         .card-topic {
-            display: inline-block; font-size: 15px; font-weight: 600; color: #475569;
-            background: #f1f5f9; border-radius: 4px; padding: 3px 8px; margin-bottom: 10px;
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            max-width: 100%;
+            margin-bottom: 0.75rem;
+            padding: 0.28rem 0.62rem;
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            background: var(--panel-soft);
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 650;
+            line-height: 1.35;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
         }
 
-        strong { color: #d32f2f; font-weight: 600; } 
-        .cloze { font-weight: bold; color: #1890ff; background: #e6f7ff; padding: 2px 6px; border-radius: 4px; border-bottom: 2px dashed #1890ff; transition: all 0.3s ease; }
-        .cloze:hover { background: #1890ff; color: #fff; cursor: pointer; }
+        .card-title {
+            margin: 0 0 1.35rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--line);
+            color: var(--ink);
+            font-size: 1.12rem;
+            font-weight: 750;
+            line-height: 1.45;
+        }
 
-        table { width: 100%; max-width: 100%; border-collapse: collapse; margin: 18px 0; font-size: clamp(10px, 1.25vw, 16px); line-height: 1.35; background-color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; table-layout: auto; }
-        th { background-color: #f8fafc; color: #475569; font-weight: 600; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+        strong {
+            color: var(--answer);
+            font-weight: 720;
+        }
+
+        .cloze {
+            display: inline;
+            color: var(--accent-strong);
+            background: linear-gradient(180deg, rgba(227, 240, 235, 0.35), var(--accent-soft));
+            border: 1px solid rgba(47, 118, 103, 0.22);
+            border-bottom-color: rgba(47, 118, 103, 0.48);
+            border-radius: 0.38rem;
+            padding: 0.06rem 0.34rem 0.1rem;
+            font-weight: 780;
+            box-decoration-break: clone;
+            -webkit-box-decoration-break: clone;
+            transition: background-color 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out;
+        }
+
+        .cloze:hover {
+            color: #173e38;
+            background: #d7ebe3;
+            border-color: rgba(47, 118, 103, 0.5);
+        }
+
+        p {
+            margin: 0 0 1.05rem;
+        }
+
+        ul, ol {
+            margin: 1rem 0 1.25rem;
+            padding-left: 1.35rem;
+        }
+
+        li {
+            margin-bottom: 0.58rem;
+            padding-left: 0.16rem;
+        }
+
+        li::marker {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .visual-note {
+            margin: 1.15rem 0 1.3rem;
+            padding: 0.92rem 1rem;
+            border: 1px solid #dde5dc;
+            border-radius: 12px;
+            background: #f7f8f3;
+            color: #3f4945;
+            font-size: 0.95rem;
+            line-height: 1.58;
+        }
+
+        .visual-note strong {
+            display: block;
+            margin-bottom: 0.35rem;
+            color: #6f5d37;
+            font-size: 0.78rem;
+            font-weight: 780;
+            letter-spacing: 0.06em;
+        }
+
+        .visual-note-page {
+            background: #fbf6ec;
+            border-color: #e7dac1;
+        }
+
+        .table-wrap {
+            width: min(100%, 58rem);
+            max-width: calc(100vw - 72px);
+            margin: 1.15rem auto 1.35rem;
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel);
+            box-shadow: 0 8px 26px rgba(36, 44, 40, 0.06);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            min-width: 34rem;
+            border-collapse: collapse;
+            margin: 0;
+            background-color: var(--panel);
+            color: var(--ink);
+            font-size: 0.86rem;
+            line-height: 1.42;
+            table-layout: auto;
+        }
+
+        th {
+            background-color: #f0f2eb;
+            color: #39433f;
+            font-weight: 720;
+            padding: 0.58rem 0.7rem;
+            text-align: left;
+            border-bottom: 1px solid var(--line);
+        }
+
+        td {
+            padding: 0.58rem 0.7rem;
+            border-bottom: 1px solid #eeeeea;
+            color: #38423f;
+            vertical-align: top;
+        }
+
         tr:last-child td { border-bottom: none; }
-        tr:hover { background-color: #f8fafc; }
-        .table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        tr:nth-child(even) td { background: #fbfbf7; }
+        tr:hover td { background-color: #eef5f1; }
 
-        ul, ol { margin-top: 10px; margin-bottom: 20px; padding-left: 30px; }
-        li { margin-bottom: 10px; }
+        .back-section {
+            margin-top: 1.85rem;
+            padding: 1.15rem 1.2rem;
+            border: 1px solid #dce7df;
+            border-radius: 14px;
+            background: #f4faf7;
+            color: #33413d;
+            font-size: 1.05rem;
+            line-height: 1.65;
+        }
 
-        .back-section { margin-top: 30px; padding-top: 25px; border-top: 2px dashed #e2e8f0; font-size: 20px; color: #475569; background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981; }
-        .source-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 15px; line-height: 1.6; color: #64748b; }
-        .source-section strong { color: #475569; }
-        .nav-controls { position: absolute; bottom: 20px; left: 30px; font-size: 14px; color: #cbd5e1; font-weight: 600; letter-spacing: 1px; }
-        @media (max-width: 640px) {
-            .card-container { width: 94vw; height: 90vh; padding: 28px 24px; border-radius: 12px; }
-            .content-area { font-size: 21px; line-height: 1.7; }
-            .card-title { font-size: 18px; }
-            table { font-size: 10px; line-height: 1.25; }
-            th, td { padding: 4px 5px; }
-            .back-section { font-size: 17px; padding: 14px; }
+        .back-section::before {
+            content: "临床点拨";
+            display: block;
+            margin-bottom: 0.55rem;
+            color: var(--accent-strong);
+            font-size: 0.76rem;
+            font-weight: 780;
+            letter-spacing: 0.08em;
+        }
+
+        .source-section {
+            margin-top: 1rem;
+            padding-top: 0.9rem;
+            border-top: 1px solid #dce7df;
+            color: #69766f;
+            font-size: 0.84rem;
+            line-height: 1.58;
+        }
+
+        .source-section strong {
+            color: #42504b;
+            font-weight: 720;
+        }
+
+        .card-brand {
+            margin-top: 1.45rem;
+            color: #a9afa6;
+            font-size: 0.72rem;
+            font-weight: 680;
+            letter-spacing: 0.14em;
+            text-align: right;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 700px) {
+            body { align-items: stretch; }
+            .card-shell {
+                width: 100vw;
+                height: 100vh;
+                padding: 9px;
+            }
+            .card-container {
+                border-radius: 18px;
+                padding: 24px 22px 22px;
+            }
+            .card-container::before {
+                top: -24px;
+                margin: -24px -22px 22px;
+            }
+            .content-area {
+                max-width: none;
+                font-size: 1.22rem;
+                line-height: 1.72;
+            }
+            .card-topic {
+                font-size: 0.68rem;
+                white-space: normal;
+            }
+            .card-title {
+                font-size: 1rem;
+                margin-bottom: 1.05rem;
+            }
+            .cloze {
+                padding: 0.04rem 0.24rem 0.08rem;
+            }
+            .table-wrap {
+                max-width: calc(100vw - 44px);
+                margin-left: 0;
+                margin-right: 0;
+                border-radius: 10px;
+            }
+            table {
+                min-width: 30rem;
+                font-size: 0.72rem;
+                line-height: 1.32;
+            }
+            th, td {
+                padding: 0.42rem 0.5rem;
+            }
+            .back-section {
+                margin-top: 1.3rem;
+                padding: 0.9rem 0.95rem;
+                font-size: 0.96rem;
+            }
+            .source-section {
+                font-size: 0.76rem;
+            }
         }
         """
 
@@ -1084,8 +1356,8 @@ class ProcessingThread(QThread):
             fields=[{'name': 'Front'}, {'name': 'Back'}],
             templates=[{
                 'name': 'Clinical Card',
-                'qfmt': '<div class="card-container"><div class="content-area">{{cloze:Front}}</div><div class="nav-controls">pdf2anki</div></div>',
-                'afmt': '<div class="card-container"><div class="content-area">{{cloze:Front}}<div class="back-section">{{Back}}</div></div><div class="nav-controls">pdf2anki</div></div>',
+                'qfmt': '<main class="card-shell"><section class="card-container"><article class="content-area">{{cloze:Front}}<div class="card-brand">pdf2anki</div></article></section></main>',
+                'afmt': '<main class="card-shell"><section class="card-container"><article class="content-area">{{cloze:Front}}<div class="back-section">{{Back}}</div><div class="card-brand">pdf2anki</div></article></section></main>',
             }],
             css=css,
             model_type=genanki.Model.CLOZE
